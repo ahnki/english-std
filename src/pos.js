@@ -2,6 +2,8 @@
 // 한국어 뜻의 끝모양과 영어 철자를 보고 품사를 "추측"합니다.
 // 100% 정확하지는 않아서, 의심스러운 단어는 posCheck(확인 필요)로 표시해 둡니다.
 
+export const USE_POS = false // true로 바꾸면 품사 추측을 다시 켭니다
+
 export const POS_LABELS = {
   n: '명사',
   v: '동사',
@@ -78,6 +80,7 @@ export function enGuess(word) {
  *  - 같은 덩어리 안에서도 품사가 바뀌면 나눕니다. 예: 직접적인(adj), ~로 향하다(v)
  */
 export function guessSenses(meaning, word, kind) {
+  if (!USE_POS) return { senses: [], posCheck: false }
   const text = (meaning || '').replace(/；/g, ';').trim()
   if (!text) return { senses: [], posCheck: false }
   if (kind !== 'word') return { senses: [{ pos: 'phr', ko: text }], posCheck: false }

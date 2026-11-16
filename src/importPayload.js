@@ -6,9 +6,15 @@
 //   users/{uid}/folders/{카테고리}/{폴더키}           폴더 정보 (이름, 단어 수 ...)
 //   users/{uid}/words/{카테고리}/{폴더키}/{단어ID}    그 폴더의 단어들
 
+// "1d" ~ "9d" 를 "01d" ~ "09d" 로 맞춥니다. (Firebase 콘솔에서 01d, 02d, ... 10d 순서로 정렬되도록)
+export function padDay(name) {
+  const m = String(name).trim().match(/^(\d+)\s*d$/i)
+  return m ? `${m[1].padStart(2, '0')}d` : String(name).trim()
+}
+
 // Firebase 키에는 . $ # [ ] / 를 쓸 수 없어서 _ 로 바꿉니다.
 export function folderKeyOf(name) {
-  const key = String(name).trim().replace(/[.$#[\]/\\]/g, '_')
+  const key = padDay(name).replace(/[.$#[\]/\\]/g, '_')
   return key || 'sheet'
 }
 
@@ -48,7 +54,7 @@ export function buildFolderPayload({ category, sheetName, items, stats, fileName
   })
 
   const folder = {
-    name: sheetName,
+    name: padDay(sheetName),
     category,
     order: folderOrderOf(sheetName, index),
     count: items.length,
