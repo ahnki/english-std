@@ -2,11 +2,12 @@ import { useEffect, useMemo, useState } from 'react'
 import * as XLSX from 'xlsx'
 import { ref, get, update } from 'firebase/database'
 import { db } from './firebase'
-import { parseSheet } from './parseSheet'
+import { parseByCategory } from './parsers'
+import { CATEGORIES, guessCategory, isKnownSheet } from './categories'
 import { formatSenses } from './pos'
 import { buildFolderPayload, folderKeyOf } from './importPayload'
 
-const ROLE_LABEL = { head: '핵심', related: '파생', extra: '추가' }
+const ROLE_LABEL = { head: '핵심', related: '파생', extra: '추가', main: '' }
 const PREVIEW_STEP = 60
 
 function dbError(err) {
@@ -17,14 +18,22 @@ function dbError(err) {
   return `오류가 발생했어요. (${err?.code || err?.message || '알 수 없음'})`
 }
 
+// 시트 표에 보여줄 "구성" 글자
+function describe(p) {
+  const s = p.stats
+  if (p.category === 'toeic') return `핵심 ${s.head} · 파생 ${s.related} · 추가 ${s.extra}`
+  return `${s.total}개` + (s.topics.length > 1 ? ` · 주제 ${s.topics.length}개` : '')
+}
+
 export default function ImportPage({ user }) {
   const [fileName, setFileName] = useState('')
   const [rawSheets, setRawSheets] = useState([]) // [{ name, rows }]
+  const [catOf, setCatOf] = useState({}) // 시트 이름 -> 카테고리 id
   const [skipHeader, setSkipHeader] = useState(false)
   const [selected, setSelected] = useState({}) // 시트 이름 -> 선택 여부
   const [previewName, setPreviewName] = useState('')
   const [showCount, setShowCount] = useState(PREVIEW_STEP)
-  const [existing, setExisting] = useState([]) // 이미 저장된 폴더 키
+  const [existing, setExisting] = useState([]) // 이미 저장된 폴더 ("카테고리/폴더키")
   const [mode, setMode] = useState('skip') // skip | overwrite
   const [busy, setBusy] = useState(false)
   const [progress, setProgress] = useState('')
@@ -32,7 +41,12 @@ export default function ImportPage({ user }) {
 
   async function loadExisting() {
     const snap = await get(ref(db, `users/${user.uid}/folders`))
-    setExisting(snap.exists() ? Object.keys(snap.val()) : [])
+    const value = snap.val() || {}
+    const keys = []
+    for (const [cat, folders] of Object.entries(value)) {
+      for (const key of Object.keys(folders || {})) keys.push(`${cat}/${key}`)
+    }
+    setExisting(keys)
   }
 
   useEffect(() => {
@@ -59,7 +73,9 @@ export default function ImportPage({ user }) {
       }))
       setFileName(file.name)
       setRawSheets(sheets)
-      setSelected(Object.fromEntries(sheets.map((s) => [s.name, true])))
+      setCatOf(Object.fromEntries(sheets.map((s) => [s.name, guessCategory(s.name)])))
+      // 이름을 아는 시트(1d~30d, 회화, 기본단어, 순우리말)만 처음부터 체크해 둡니다.
+      setSelected(Object.fromEntries(sheets.map((s) => [s.name, isKnownSheet(s.name)])))
       setPreviewName(sheets[0]?.name || '')
       setShowCount(PREVIEW_STEP)
     } catch (err) {
@@ -68,23 +84,28 @@ export default function ImportPage({ user }) {
     }
   }
 
-  // 시트마다 읽기 규칙을 적용합니다. (제목 줄 옵션이 바뀌면 다시 계산)
+  // 시트마다, 고른 카테고리의 읽기 규칙을 적용합니다.
   const parsed = useMemo(
-    () => rawSheets.map((s) => ({ name: s.name, ...parseSheet(s.rows, { skipHeader }) })),
-    [rawSheets, skipHeader],
+    () =>
+      rawSheets.map((s) => {
+        const category = catOf[s.name] || 'word'
+        return { name: s.name, category, ...parseByCategory(category, s.rows, { skipHeader }) }
+      }),
+    [rawSheets, skipHeader, catOf],
   )
 
+  const existsKey = (p) => `${p.category}/${folderKeyOf(p.name)}`
   const selectedSheets = parsed.filter((p) => selected[p.name])
   const totalWords = selectedSheets.reduce((sum, p) => sum + p.stats.total, 0)
-  const overwriteCount = selectedSheets.filter((p) => existing.includes(folderKeyOf(p.name))).length
+  const overwriteCount = selectedSheets.filter((p) => existing.includes(existsKey(p))).length
 
-  // 선택한 시트들 사이에서 겹치는 단어 수
+  // 같은 카테고리 안에서 선택한 시트끼리 겹치는 단어 수
   const crossDup = useMemo(() => {
     const seen = new Map()
     for (const p of parsed) {
       if (!selected[p.name]) continue
-      for (const key of new Set(p.items.map((i) => i.word.toLowerCase()))) {
-        seen.set(key, (seen.get(key) || 0) + 1)
+      for (const w of new Set(p.items.map((i) => `${p.category}:${i.word.toLowerCase()}`))) {
+        seen.set(w, (seen.get(w) || 0) + 1)
       }
     }
     return [...seen.values()].filter((n) => n > 1).length
@@ -113,13 +134,14 @@ export default function ImportPage({ user }) {
       for (let idx = 0; idx < parsed.length; idx++) {
         const p = parsed[idx]
         if (!selected[p.name]) continue
-        const key = folderKeyOf(p.name)
-        if (existing.includes(key) && mode === 'skip') {
+        if (existing.includes(existsKey(p)) && mode === 'skip') {
           skipped++
           continue
         }
         setProgress(`${p.name} 저장 중… (${savedFolders + skipped + 1}/${selectedSheets.length})`)
+        const cat = CATEGORIES.find((c) => c.id === p.category)
         const payload = buildFolderPayload({
+          category: p.category,
           sheetName: p.name,
           items: p.items,
           stats: p.stats,
@@ -127,10 +149,11 @@ export default function ImportPage({ user }) {
           index: idx,
           now,
         })
-        // 폴더 정보와 단어들을 한 번에 저장합니다. (둘 다 성공하거나 둘 다 실패해요)
+        // 카테고리, 폴더 정보, 단어들을 한 번에 저장합니다. (모두 성공하거나 모두 실패해요)
         await update(ref(db, `users/${user.uid}`), {
-          [`folders/${payload.key}`]: payload.folder,
-          [`words/${payload.key}`]: payload.words,
+          [`categories/${cat.id}`]: { name: cat.name, template: cat.template, order: cat.order },
+          [`folders/${cat.id}/${payload.key}`]: payload.folder,
+          [`words/${cat.id}/${payload.key}`]: payload.words,
         })
         savedFolders++
         savedWords += p.items.length
@@ -155,7 +178,8 @@ export default function ImportPage({ user }) {
       <section className="card">
         <h2>엑셀 가져오기</h2>
         <p className="muted">
-          엑셀 파일을 고르면 시트마다 단어를 자동으로 읽어요. 저장하기 전에 미리보기로 확인할 수 있어요.
+          엑셀 파일을 고르면 시트마다 자동으로 읽어요. 시트별로 카테고리(토익, 회화, 단어, 한글)를 확인하고,
+          미리보기로 살펴본 뒤 저장해 주세요.
         </p>
         <input type="file" accept=".xlsx,.xlsm,.xls" onChange={handleFile} />
         <label className="check">
@@ -181,9 +205,8 @@ export default function ImportPage({ user }) {
                   <tr>
                     <th></th>
                     <th>시트</th>
-                    <th className="num">핵심</th>
-                    <th className="num">파생</th>
-                    <th className="num">추가</th>
+                    <th>카테고리</th>
+                    <th>구성</th>
                     <th className="num">예문</th>
                     <th className="num">품사 확인</th>
                     <th className="num">경고</th>
@@ -212,24 +235,42 @@ export default function ImportPage({ user }) {
                           {p.name}
                         </button>
                       </td>
-                      <td className="num">{p.stats.head}</td>
-                      <td className="num">{p.stats.related}</td>
-                      <td className="num">{p.stats.extra}</td>
+                      <td>
+                        <select
+                          value={p.category}
+                          onChange={(e) => setCatOf({ ...catOf, [p.name]: e.target.value })}
+                        >
+                          {CATEGORIES.map((c) => (
+                            <option key={c.id} value={c.id}>{c.name}</option>
+                          ))}
+                        </select>
+                      </td>
+                      <td>{describe(p)}</td>
                       <td className="num">{p.stats.examples}</td>
                       <td className="num">{p.stats.posCheck}</td>
                       <td className="num">{p.warnings.length ? <strong className="bad-text">{p.warnings.length}</strong> : 0}</td>
-                      <td>{existing.includes(folderKeyOf(p.name)) ? <span className="badge">이미 있음</span> : ''}</td>
+                      <td>{existing.includes(existsKey(p)) ? <span className="badge">이미 있음</span> : ''}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
-            <p className="muted small-text">시트 이름을 누르면 아래에서 내용을 미리 볼 수 있어요.</p>
+            <p className="muted small-text">
+              시트 이름을 누르면 아래에서 내용을 미리 볼 수 있어요. 카테고리를 바꾸면 그 카테고리의 읽기 규칙으로 다시 읽어요.
+            </p>
           </section>
 
           {current && (
             <section className="card">
-              <h2>미리보기 · {current.name}</h2>
+              <h2>미리보기 · {current.name} <span className="muted small-text">({CATEGORIES.find((c) => c.id === current.category)?.name})</span></h2>
+
+              {current.stats.topics.length > 0 && (
+                <div className="chips">
+                  {current.stats.topics.map((t) => (
+                    <span className="badge chip" key={t.name}>{t.name} {t.count}</span>
+                  ))}
+                </div>
+              )}
 
               {current.warnings.length > 0 && (
                 <div className="warn">
@@ -242,29 +283,52 @@ export default function ImportPage({ user }) {
                 </div>
               )}
 
+              {current.notices.length > 0 && (
+                <details className="notices">
+                  <summary>자동으로 처리한 것 {current.notices.length}개 (눌러서 보기)</summary>
+                  <ul className="plain">
+                    {current.notices.map((n, i) => (
+                      <li key={i}>{n.message}</li>
+                    ))}
+                  </ul>
+                </details>
+              )}
+
               <div className="table-wrap">
                 <table className="preview">
                   <thead>
                     <tr>
                       <th>구분</th>
                       <th className="num">번호</th>
-                      <th>단어</th>
+                      <th>{current.category === 'conv' ? '문장' : '단어'}</th>
                       <th>뜻</th>
+                      <th>발음 · 메모</th>
                       <th>예문</th>
                     </tr>
                   </thead>
                   <tbody>
                     {current.items.slice(0, showCount).map((it, i) => (
                       <tr key={i} className={`role-${it.role}`}>
-                        <td><span className={`badge role-${it.role}`}>{ROLE_LABEL[it.role]}</span></td>
+                        <td>
+                          {current.category === 'toeic' ? (
+                            <span className={`badge role-${it.role}`}>{ROLE_LABEL[it.role]}</span>
+                          ) : (
+                            it.topic && <span className="badge topic">{it.topic}</span>
+                          )}
+                        </td>
                         <td className="num">{it.no ?? ''}</td>
                         <td>
                           {it.word}
-                          {it.dup && <span className="badge warn-badge" title="같은 시트에 같은 단어가 또 있어요">중복</span>}
+                          {it.kind === 'pattern' && <span className="badge">패턴</span>}
+                          {it.dup && <span className="badge warn-badge" title="같은 시트에 같은 표현이 또 있어요">중복</span>}
                         </td>
                         <td>
-                          {formatSenses(it.senses)}
+                          {it.senses.length ? formatSenses(it.senses) : it.meaning}
                           {it.posCheck && <span className="badge warn-badge" title="품사를 확인해 주세요">품사 확인</span>}
+                        </td>
+                        <td className="examples">
+                          {it.pron && <div>{it.pron}</div>}
+                          {it.memo && <div className="muted">{it.memo}</div>}
                         </td>
                         <td className="examples">
                           {it.examples.map((ex, k) => (
@@ -293,7 +357,7 @@ export default function ImportPage({ user }) {
             <p>
               선택한 시트 <strong>{selectedSheets.length}개</strong>, 단어 <strong>{totalWords}개</strong>를 저장해요.
               {crossDup > 0 && (
-                <span className="muted"> (선택한 시트끼리 겹치는 단어 {crossDup}개는 모두 그대로 저장돼요.)</span>
+                <span className="muted"> (같은 카테고리 안에서 시트끼리 겹치는 표현 {crossDup}개는 모두 그대로 저장돼요.)</span>
               )}
             </p>
 

@@ -196,3 +196,45 @@ td > .badge.role-head, td > .badge.role-related, td > .badge.role-extra { margin
 
 .card .secondary { margin-top: 4px; }
 .card > .primary { margin-top: 8px; }
+
+/* ---------- 카테고리 버튼, 선택 상자, 주제 표시 ---------- */
+.cat-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+  margin-bottom: 20px;
+}
+.cat-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  text-align: left;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 18px 18px 16px;
+  color: var(--ink);
+}
+.cat-card:hover { border-color: var(--accent); }
+.cat-card.on { border-color: var(--accent); box-shadow: 0 0 0 2px #d4e3f5; }
+.cat-card.empty { background: transparent; border-style: dashed; }
+.cat-name { font-size: 1.25rem; font-weight: 700; }
+.cat-meta { font-size: 0.88rem; color: var(--muted); }
+
+select {
+  font: inherit;
+  font-size: 0.9rem;
+  padding: 4px 8px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #fff;
+  color: var(--ink);
+}
+
+.chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 12px; }
+.chip { margin-left: 0; }
+.badge.topic { margin-left: 0; background: #eef4fb; border-color: #cfe0f3; color: var(--accent); }
+
+.notices { margin-bottom: 12px; font-size: 0.9rem; color: var(--muted); }
+.notices summary { cursor: pointer; }
