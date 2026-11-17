@@ -3,11 +3,11 @@ import { ref, onValue } from 'firebase/database'
 import { db } from './firebase'
 import { CATEGORIES } from './categories'
 
-// 초기 화면: 카테고리(토익, 회화, 단어, 한글) 버튼 4개
-export default function Home({ user }) {
+// 초기 화면: 카테고리(토익, 회화, 단어, 한글) 버튼 4개. 누르면 폴더 목록, 폴더를 누르면 단어 목록으로 이동합니다.
+export default function Home({ user, initialOpen = '', onOpenFolder, onStudyFolder }) {
   const [folders, setFolders] = useState(null) // { 카테고리: [폴더, ...] }, null = 불러오는 중
   const [stored, setStored] = useState({}) // Firebase에 저장된 카테고리 정보
-  const [open, setOpen] = useState('') // 펼쳐 본 카테고리
+  const [open, setOpen] = useState(initialOpen) // 펼쳐 본 카테고리
   const [error, setError] = useState('')
 
   useEffect(() => {
@@ -73,14 +73,14 @@ export default function Home({ user }) {
             })}
           </div>
 
-          {!open && <p className="muted small-text">카테고리를 누르면 폴더 목록을 볼 수 있어요. 학습 화면은 다음 단계에서 만들어요.</p>}
+          {!open && <p className="muted small-text">카테고리를 누르면 폴더 목록을 볼 수 있어요. 폴더를 누르면 단어를 보고 고칠 수 있어요.</p>}
 
           {open && (
             <section className="card">
               <h2>{openCat?.name}</h2>
               {openFolders.length === 0 ? (
                 <p className="muted">
-                  아직 단어가 없어요. 위쪽 <strong>엑셀 가져오기</strong>에서 이 카테고리로 등록해 주세요.
+                  아직 단어가 없어요. <strong>엑셀 가져오기</strong>나 <strong>단어 추가</strong>에서 이 카테고리로 등록해 주세요.
                 </p>
               ) : (
                 <div className="table-wrap">
@@ -91,15 +91,25 @@ export default function Home({ user }) {
                         {openCat?.id === 'toeic' && <th className="num">핵심</th>}
                         <th className="num">전체</th>
                         <th className="num">예문</th>
+                        <th></th>
                       </tr>
                     </thead>
                     <tbody>
                       {openFolders.map((f) => (
-                        <tr key={f.id}>
-                          <td>{f.name}</td>
+                        <tr key={f.id} className="clickable" onClick={() => onOpenFolder(open, f.id)}>
+                          <td>
+                            <button type="button" className="link" onClick={() => onOpenFolder(open, f.id)}>
+                              {f.name}
+                            </button>
+                          </td>
                           {openCat?.id === 'toeic' && <td className="num">{f.head ?? 0}</td>}
                           <td className="num">{f.count ?? 0}</td>
                           <td className="num">{f.examples ?? 0}</td>
+                          <td className="num">
+                            <button type="button" className="link" onClick={(e) => { e.stopPropagation(); onStudyFolder(open, f.id) }}>
+                              학습
+                            </button>
+                          </td>
                         </tr>
                       ))}
                     </tbody>

@@ -238,3 +238,153 @@ select {
 
 .notices { margin-bottom: 12px; font-size: 0.9rem; color: var(--muted); }
 .notices summary { cursor: pointer; }
+
+/* ---------- 6단계: 단어 목록, 수정 칸, 추가 화면 ---------- */
+.page.mid { max-width: 640px; }
+
+.crumbs { margin-bottom: 10px; }
+.card-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
+.no-margin { margin: 0; }
+.primary.slim { padding: 8px 14px; }
+
+.filters { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
+.filters .grow { flex: 1 1 220px; }
+input[type='search'], .filters input {
+  font: inherit;
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--ink);
+}
+.filters select { padding: 8px; }
+
+.wlist { list-style: none; margin: 0 0 12px; padding: 0; }
+.wrow { border-bottom: 1px solid var(--line); }
+.wrow.open { background: #f8fafc; }
+.wsum {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 10px;
+  padding: 9px 6px;
+  cursor: pointer;
+}
+.wsum:hover { background: #f3f6fa; }
+.wtext { font-weight: 600; }
+.wmean { flex: 1 1 200px; color: var(--ink); }
+.wpron { color: var(--muted); font-size: 0.88rem; }
+.num-tag { color: var(--muted); font-size: 0.82rem; min-width: 1.4em; text-align: right; }
+.wrow.role-head .wtext { font-weight: 700; }
+.wrow.role-related .wsum { padding-left: 30px; }
+.wsum .badge { margin-left: 0; }
+
+tr.clickable { cursor: pointer; }
+tr.clickable:hover { background: #f3f6fa; }
+
+.editor {
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 14px;
+  margin: 2px 6px 12px;
+}
+.field { display: flex; flex-direction: column; gap: 4px; margin-bottom: 10px; font-size: 0.9rem; font-weight: 600; flex: 1 1 0; }
+.field input, .field textarea, .field select {
+  font: inherit;
+  font-weight: 400;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--ink);
+}
+.field input:focus, .field textarea:focus, .field select:focus, .filters input:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+  border-color: var(--accent);
+}
+.field-row { display: flex; gap: 10px; flex-wrap: wrap; }
+.field-row .field { min-width: 160px; }
+
+.ex-row { display: flex; gap: 6px; align-items: center; margin-top: 4px; }
+.ex-row input { flex: 1 1 0; min-width: 0; }
+.icon-btn {
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  width: 30px;
+  height: 30px;
+  line-height: 1;
+  font-size: 1.1rem;
+  color: var(--muted);
+}
+.icon-btn:hover { color: var(--bad); border-color: var(--bad); }
+.link.left { align-self: flex-start; margin-top: 6px; font-weight: 400; }
+
+.editor-actions { display: flex; gap: 10px; align-items: center; }
+.danger {
+  background: transparent;
+  color: var(--bad);
+  border: 1px solid var(--bad);
+  border-radius: 8px;
+  padding: 10px 14px;
+}
+.danger:hover:not(:disabled) { background: #fdeceb; }
+
+.add-form { display: flex; flex-direction: column; }
+.add-form > .primary { align-self: flex-start; margin-top: 6px; }
+
+@media (max-width: 560px) {
+  .ex-row { flex-wrap: wrap; }
+  .ex-row input { flex-basis: 100%; }
+}
+
+/* ---------- 7단계: 학습 화면 ---------- */
+.head-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.secondary.slim { padding: 8px 14px; margin-top: 0; }
+.sub { font-size: 0.98rem; margin: 18px 0 8px; }
+
+.study-stats { margin: 0 0 14px; padding: 10px 12px; background: var(--paper); border-radius: 8px; font-size: 0.92rem; }
+.seg { display: inline-flex; flex-wrap: wrap; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; align-self: flex-start; }
+.seg button { background: #fff; border: none; padding: 8px 14px; color: var(--ink); font-weight: 400; }
+.seg button + button { border-left: 1px solid var(--line); }
+.seg button.on { background: var(--accent); color: #fff; font-weight: 600; }
+.range-row { display: flex; align-items: center; gap: 8px; }
+.range-row input { width: 100px; font: inherit; font-weight: 400; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; }
+#root .field .seg { margin-bottom: 2px; }
+
+.study-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+.bar { height: 6px; background: var(--line); border-radius: 3px; margin-bottom: 14px; overflow: hidden; }
+.bar > div { height: 100%; background: var(--accent); transition: width 0.25s; }
+
+.study-card { min-height: 240px; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; gap: 8px; cursor: default; }
+.study-big { font-size: 1.9rem; font-weight: 700; line-height: 1.35; word-break: break-word; }
+.study-small { font-size: 1rem; }
+.study-word { font-size: 1.2rem; font-weight: 700; }
+.study-detail { margin-top: 8px; display: flex; flex-direction: column; gap: 4px; align-items: center; font-size: 0.95rem; }
+.study-memo { color: #8a5a00; background: var(--warn-bg); border-radius: 6px; padding: 3px 10px; }
+.study-ex { margin-top: 4px; }
+.icon-btn.speak { margin-left: 10px; width: 36px; height: 36px; font-size: 1rem; vertical-align: middle; }
+
+.options { display: flex; flex-direction: column; gap: 8px; width: 100%; margin-top: 10px; }
+.option {
+  display: flex; align-items: center; gap: 12px; text-align: left;
+  background: #fff; border: 1px solid var(--line); border-radius: 10px;
+  padding: 12px 14px; color: var(--ink); font-size: 1rem;
+}
+.option:hover:not(:disabled) { border-color: var(--accent); background: #f5f9fe; }
+.opt-no { flex: none; width: 24px; height: 24px; border-radius: 50%; background: var(--paper); color: var(--muted); font-size: 0.8rem; display: inline-flex; align-items: center; justify-content: center; }
+.option.right { background: #e6f4ee; border-color: var(--ok); }
+.option.wrong { background: #fdeceb; border-color: var(--bad); }
+.option.dim { opacity: 0.55; }
+
+.study-actions { display: flex; gap: 10px; justify-content: center; margin: 4px 0 20px; flex-wrap: wrap; align-items: center; }
+.study-actions.left { justify-content: flex-start; margin-top: 16px; }
+.big-score { font-size: 2.2rem; font-weight: 700; margin: 6px 0; }
+.wrong-list li { margin-bottom: 4px; }
+
+/* 학습 화면 보정: 설명 글자는 굵지 않게, 답한 뒤에도 보기 글자를 진하게 */
+.field .muted { font-weight: 400; }
+.option:disabled { color: var(--ink); cursor: default; opacity: 1; }
+.option.dim:disabled { color: var(--muted); opacity: 0.6; }

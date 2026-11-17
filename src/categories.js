@@ -6,12 +6,13 @@
 //   word     표제어 + 뜻 + (발음, 메모, 예문)
 //   sentence 문장 + 뜻 + 발음
 // parser: 엑셀을 읽는 방식 (parsers.js 참고)
+// speech: 발음 듣기에 쓸 언어 (영어 en-US, 한국어 ko-KR)
 
 export const CATEGORIES = [
-  { id: 'toeic', name: '토익', template: 'word', order: 1, parser: 'toeic' },
-  { id: 'conv', name: '회화', template: 'sentence', order: 2, parser: 'conversation' },
-  { id: 'word', name: '단어', template: 'word', order: 3, parser: 'wordlist' },
-  { id: 'korean', name: '한글', template: 'word', order: 4, parser: 'korean' },
+  { id: 'toeic', name: '토익', template: 'word', order: 1, parser: 'toeic', speech: 'en-US' },
+  { id: 'conv', name: '회화', template: 'sentence', order: 2, parser: 'conversation', speech: 'en-US' },
+  { id: 'word', name: '단어', template: 'word', order: 3, parser: 'wordlist', speech: 'en-US' },
+  { id: 'korean', name: '한글', template: 'word', order: 4, parser: 'korean', speech: 'ko-KR' },
 ]
 
 // 시트 이름으로 카테고리를 추정합니다. (화면에서 바꿀 수 있어요)
@@ -29,3 +30,7 @@ export function isKnownSheet(sheetName) {
   const name = String(sheetName).trim()
   return /^\d+\s*d$/i.test(name) || ['회화', '기본단어', '순우리말'].includes(name)
 }
+
+// 카테고리 id 로 정보를 찾습니다. (없으면 기본값)
+export const getCategory = (id) =>
+  CATEGORIES.find((c) => c.id === id) || { id, name: id, template: 'word', order: 99, speech: 'en-US' }

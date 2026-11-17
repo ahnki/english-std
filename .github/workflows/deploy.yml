@@ -1,0 +1,66 @@
+# main 브랜치에 올릴 때마다 앱을 빌드해서 GitHub Pages 에 자동으로 배포합니다.
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [main, master]
+  workflow_dispatch: # Actions 탭에서 수동으로 실행할 수도 있어요.
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 소스 내려받기
+        uses: actions/checkout@v4
+
+      - name: Node.js 준비
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      # Firebase 설정값은 저장소에 올리지 않고, GitHub 의 FIREBASE_ENV 시크릿에서 가져옵니다.
+      - name: Firebase 설정값 만들기
+        env:
+          FIREBASE_ENV: ${{ secrets.FIREBASE_ENV }}
+        run: |
+          if [ -z "$FIREBASE_ENV" ]; then
+            echo "::error::FIREBASE_ENV 시크릿이 비어 있어요. 저장소 Settings > Secrets and variables > Actions 에서 .env 파일의 내용을 FIREBASE_ENV 이름으로 등록해 주세요."
+            exit 1
+          fi
+          printf '%s\n' "$FIREBASE_ENV" | tr -d '\r' > .env.production
+          if ! grep -q '^VITE_FIREBASE_API_KEY=.\+' .env.production; then
+            echo "::error::FIREBASE_ENV 시크릿에 VITE_FIREBASE_API_KEY=... 줄이 없어요. .env 파일의 내용을 통째로 붙여넣었는지 확인해 주세요."
+            exit 1
+          fi
+          echo "Firebase 설정 줄 수: $(grep -c '^VITE_FIREBASE_' .env.production)"
+
+      - name: 부품 설치
+        run: npm ci || npm install
+
+      - name: 빌드
+        run: npm run build
+
+      - name: 배포용 파일 올리기
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: GitHub Pages 에 배포
+        id: deployment
+        uses: actions/deploy-pages@v4
