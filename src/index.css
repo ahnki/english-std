@@ -388,3 +388,7 @@ tr.clickable:hover { background: #f3f6fa; }
 .field .muted { font-weight: 400; }
 .option:disabled { color: var(--ink); cursor: default; opacity: 1; }
 .option.dim:disabled { color: var(--muted); opacity: 0.6; }
+
+/* 터치 화면: 탭할 때 생기는 회색 강조와 더블탭 확대 지연을 없애 바로 반응하게 */
+button, .wsum, tr.clickable { touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+.option { user-select: none; -webkit-user-select: none; }

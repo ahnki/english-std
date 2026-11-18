@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { makeChoices } from './srs'
 import { meaningText, toArray } from './wordsLogic'
 import { canSpeak, speak } from './speech'
@@ -9,8 +9,10 @@ export default function StudySession({ cards, mode, pool, front, speechLang, aut
   const [flipped, setFlipped] = useState(false) // 플래시카드: 뒷면을 봤는지
   const [picked, setPicked] = useState(-1) // 뜻 맞히기: 고른 보기 번호
   const [results, setResults] = useState([])
-  const [busy, setBusy] = useState(false)
   const [saveError, setSaveError] = useState('')
+  const resultsRef = useRef([]) // 가장 최근 결과 (빠르게 눌러도 놓치지 않도록)
+  const pendingRef = useRef([]) // 아직 서버에 저장 중인 답들
+  const answeredRef = useRef(-1) // 이미 답한 카드 번호 (같은 카드에 두 번 답하지 않도록)
 
   const card = cards[index]
   const isQuiz = mode === 'quiz'
@@ -25,41 +27,43 @@ export default function StudySession({ cards, mode, pool, front, speechLang, aut
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [index])
 
-  async function save(correct) {
-    try {
-      await onAnswer(card, correct)
-    } catch (err) {
-      setSaveError(`학습 기록을 저장하지 못했어요. (${err.code || err.message})`)
-    }
-    return { id: card.id, word: card.word, meaning: meaningText(card), correct }
+  // 답을 기록합니다. 화면은 저장을 기다리지 않고, 서버 저장은 뒤에서 진행해요.
+  function record(correct) {
+    const r = { id: card.id, word: card.word, meaning: meaningText(card), correct }
+    const pending = Promise.resolve(onAnswer(card, correct)).catch((err) => {
+      setSaveError(`학습 기록을 저장하지 못했어요. 인터넷 연결을 확인해 주세요. (${err.code || err.message})`)
+      throw err
+    })
+    pendingRef.current.push(pending)
+    resultsRef.current = [...resultsRef.current, r]
+    setResults(resultsRef.current)
   }
 
-  async function judge(correct) {
-    if (busy) return
-    setBusy(true)
-    const r = await save(correct)
-    const next = [...results, r]
-    setResults(next)
-    setBusy(false)
-    if (index + 1 >= cards.length) onFinish(next, false)
+  function finish(quit) {
+    onFinish(resultsRef.current, quit, Promise.allSettled(pendingRef.current))
+  }
+
+  function judge(correct) {
+    if (answeredRef.current === index) return
+    answeredRef.current = index
+    record(correct)
+    if (index + 1 >= cards.length) finish(false)
     else {
       setIndex(index + 1)
       setFlipped(false)
     }
   }
 
-  async function choose(i) {
-    if (busy || picked >= 0) return
-    setBusy(true)
+  function choose(i) {
+    if (picked >= 0 || answeredRef.current === index) return
+    answeredRef.current = index
     setPicked(i)
-    const r = await save(choices[i].correct)
-    setResults([...results, r])
-    setBusy(false)
+    record(choices[i].correct)
   }
 
   function nextCard() {
     if (picked < 0) return
-    if (index + 1 >= cards.length) onFinish(results, false)
+    if (index + 1 >= cards.length) finish(false)
     else {
       setIndex(index + 1)
       setPicked(-1)
@@ -114,7 +118,7 @@ export default function StudySession({ cards, mode, pool, front, speechLang, aut
           {practice && ' · 연습(기록에 반영하지 않아요)'}
           {wrongNow > 0 && ` · 틀림 ${wrongNow}`}
         </span>
-        <button type="button" className="link" onClick={() => onFinish(results, true)}>그만하기</button>
+        <button type="button" className="link" onClick={() => finish(true)}>그만하기</button>
       </div>
       <div className="bar"><div style={{ width: `${(index / cards.length) * 100}%` }} /></div>
       {saveError && <p className="msg bad">{saveError}</p>}
@@ -186,8 +190,8 @@ export default function StudySession({ cards, mode, pool, front, speechLang, aut
       <div className="study-actions">
         {!isQuiz && flipped && (
           <>
-            <button type="button" className="danger" onClick={() => judge(false)} disabled={busy}>몰라요 (1)</button>
-            <button type="button" className="primary" onClick={() => judge(true)} disabled={busy}>알아요 (2)</button>
+            <button type="button" className="danger" onClick={() => judge(false)}>몰라요 (1)</button>
+            <button type="button" className="primary" onClick={() => judge(true)}>알아요 (2)</button>
           </>
         )}
         {!isQuiz && !flipped && (

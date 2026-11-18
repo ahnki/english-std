@@ -7,6 +7,9 @@ import { applyResult, filterForStudy, pickCards, shuffle, studyStats } from './s
 import { canSpeak } from './speech'
 import StudySession from './StudySession.jsx'
 
+// 한 번만 읽기: 아직 서버에 저장 중인 답까지 반영된 값을 돌려줍니다.
+const readOnce = (r) => new Promise((resolve, reject) => onValue(r, resolve, reject, { onlyOnce: true }))
+
 // 한 폴더 공부하기: 설정 → 학습 → 결과
 export default function Study({ user, cat, folderKey, onBack }) {
   const category = getCategory(cat)
@@ -19,6 +22,7 @@ export default function Study({ user, cat, folderKey, onBack }) {
   const [phase, setPhase] = useState('setup') // setup | session | summary
   const [session, setSession] = useState(null) // { cards, mode, practice, front }
   const [summary, setSummary] = useState(null) // { results, quit }
+  const [saveState, setSaveState] = useState('done') // 학습 기록 저장 상태: saving | done | error
 
   // 설정
   const [mode, setMode] = useState('flash') // flash | quiz
@@ -32,13 +36,19 @@ export default function Study({ user, cat, folderKey, onBack }) {
   const [autoSpeak, setAutoSpeak] = useState(false)
   const [includeNotDue, setIncludeNotDue] = useState(false)
 
+  // 폴더와 단어는 시작할 때 한 번만 불러옵니다. (답할 때마다 전체를 다시 받으면 느려져요.)
+  // 학습 결과는 아래 handleAnswer 에서 화면의 데이터에도 바로 반영합니다.
   useEffect(() => {
-    const onErr = (err) => setError(`불러오지 못했어요. (${err.code || err.message})`)
-    const off1 = onValue(ref(db, `users/${user.uid}/folders/${cat}/${folderKey}`), (s) => setFolder(s.val()), onErr)
-    const off2 = onValue(ref(db, wordsPath), (s) => setWords(s.val() || {}), onErr)
+    let cancelled = false
+    Promise.all([readOnce(ref(db, `users/${user.uid}/folders/${cat}/${folderKey}`)), readOnce(ref(db, wordsPath))])
+      .then(([f, w]) => {
+        if (cancelled) return
+        setFolder(f.val())
+        setWords(w.val() || {})
+      })
+      .catch((err) => !cancelled && setError(`불러오지 못했어요. (${err.code || err.message})`))
     return () => {
-      off1()
-      off2()
+      cancelled = true
     }
   }, [user.uid, cat, folderKey, wordsPath])
 
@@ -61,7 +71,7 @@ export default function Study({ user, cat, folderKey, onBack }) {
   const isEnglishOrKorean = Boolean(category.speech)
 
   function start(cards, practice = false) {
-    setSession({ cards: mix ? shuffle(cards) : cards, mode, practice, front })
+    setSession({ id: Date.now(), cards: mix ? shuffle(cards) : cards, mode, practice, front })
     setSummary(null)
     setPhase('session')
   }
@@ -71,22 +81,28 @@ export default function Study({ user, cat, folderKey, onBack }) {
     if (cards.length) start(cards)
   }
 
-  // 답을 낼 때마다 바로 저장합니다. (중간에 그만둬도 기록이 남아요. 연습 모드는 기록하지 않아요.)
-  async function handleAnswer(card, correct) {
-    if (session.practice) return
-    await update(ref(db, `${wordsPath}/${card.id}`), applyResult(card, correct, Date.now()))
+  // 답을 낼 때마다 화면의 데이터를 바로 갱신하고, 서버 저장은 뒤에서 합니다.
+  // (연습 모드는 기록하지 않아요. 중간에 그만둬도 지금까지의 기록은 남아요.)
+  function handleAnswer(card, correct) {
+    if (session.practice) return Promise.resolve()
+    const patch = applyResult(card, correct, Date.now())
+    setWords((prev) => (prev ? { ...prev, [card.id]: { ...prev[card.id], ...patch } } : prev))
+    return update(ref(db, `${wordsPath}/${card.id}`), patch)
   }
 
-  function finish(results, quit) {
+  function finish(results, quit, pending) {
     setSummary({ results, quit })
     setPhase('summary')
+    // 서버 저장이 모두 끝났는지 알려줍니다.
+    setSaveState('saving')
+    Promise.resolve(pending).then((rs) => setSaveState((rs || []).some((r) => r.status === 'rejected') ? 'error' : 'done'))
   }
 
   function retryWrong() {
     const ids = new Set(summary.results.filter((r) => !r.correct).map((r) => r.id))
     const cards = session.cards.filter((c) => ids.has(c.id))
     if (cards.length) {
-      setSession({ cards: mix ? shuffle(cards) : cards, mode: session.mode, practice: true, front: session.front })
+      setSession({ id: Date.now(), cards: mix ? shuffle(cards) : cards, mode: session.mode, practice: true, front: session.front })
       setSummary(null)
       setPhase('session')
     }
@@ -98,7 +114,7 @@ export default function Study({ user, cat, folderKey, onBack }) {
   if (phase === 'session' && session) {
     return (
       <StudySession
-        key={`${session.practice}-${session.cards.map((c) => c.id).join(',')}`}
+        key={session.id}
         cards={session.cards}
         mode={session.mode}
         pool={list}
@@ -128,6 +144,11 @@ export default function Study({ user, cat, folderKey, onBack }) {
               {right} / {total} <span className="muted small-text">정답 {Math.round((right / total) * 100)}%</span>
             </p>
             {session?.practice && <p className="muted small-text">연습 결과는 학습 기록에 반영하지 않았어요.</p>}
+            {!session?.practice && saveState === 'saving' && <p className="muted small-text">학습 기록을 저장하는 중…</p>}
+            {!session?.practice && saveState === 'done' && <p className="muted small-text">학습 기록을 저장했어요.</p>}
+            {!session?.practice && saveState === 'error' && (
+              <p className="msg bad">학습 기록 저장에 실패한 것이 있어요. 인터넷 연결을 확인하고 다시 공부해 주세요.</p>
+            )}
             {wrong.length > 0 && (
               <>
                 <h3 className="sub">틀린 단어 {wrong.length}개</h3>
