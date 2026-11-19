@@ -53,13 +53,16 @@ export function studyStats(list, now = Date.now()) {
 }
 
 // 오늘 공부할 카드 고르기: 복습할 때가 된 단어 → 새 단어 → (원하면) 아직 때가 안 된 단어
-export function pickCards(list, { limit = 20, now = Date.now(), includeNotDue = false } = {}) {
-  const due = list
-    .filter((w) => isDue(w, now))
-    .sort((a, b) => (a.nextReview || 0) - (b.nextReview || 0) || (b.wrongCount || 0) - (a.wrongCount || 0))
+//  includeDue / includeNew 로 "복습만", "새 단어만" 도 고를 수 있어요.
+export function pickCards(list, { limit = 20, now = Date.now(), includeNotDue = false, includeDue = true, includeNew = true } = {}) {
+  const due = includeDue
+    ? list
+        .filter((w) => isDue(w, now))
+        .sort((a, b) => (a.nextReview || 0) - (b.nextReview || 0) || (b.wrongCount || 0) - (a.wrongCount || 0))
+    : []
   let picked = due.slice(0, limit)
-  if (picked.length < limit) picked = picked.concat(list.filter(isNew).slice(0, limit - picked.length))
-  if (picked.length < limit && includeNotDue) {
+  if (includeNew && picked.length < limit) picked = picked.concat(list.filter(isNew).slice(0, limit - picked.length))
+  if (includeNotDue && picked.length < limit) {
     const rest = list
       .filter((w) => !isNew(w) && !isDue(w, now))
       .sort((a, b) => (a.nextReview || 0) - (b.nextReview || 0))

@@ -90,7 +90,7 @@ export default function App() {
               user={user}
               initialOpen={view.cat || ''}
               onOpenFolder={(cat, key) => go('folder', { cat, key })}
-              onStudyFolder={(cat, key) => go('study', { cat, key })}
+              onStudyFolder={(cat, key, preset) => go('study', { cat, key, preset })}
             />
           )}
           {view.name === 'folder' && (
@@ -106,10 +106,11 @@ export default function App() {
           )}
           {view.name === 'study' && (
             <Study
-              key={`${view.cat}/${view.key}`}
+              key={`${view.cat}/${view.key}/${JSON.stringify(view.preset || {})}`}
               user={user}
               cat={view.cat}
               folderKey={view.key}
+              preset={view.preset || {}}
               onBack={() => go('folder', { cat: view.cat, key: view.key })}
             />
           )}

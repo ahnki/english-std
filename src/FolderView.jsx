@@ -65,10 +65,14 @@ export default function FolderView({ user, cat, folderKey, onBack, onAdd, onStud
   }
 
   async function handleDelete(w) {
-    const updates = { [w.id]: null }
+    const inFolder = `words/${cat}/${folderKey}`
+    const updates = {
+      [`${inFolder}/${w.id}`]: null,
+      [`progress/${cat}/${folderKey}/${w.id}`]: null, // 공부 기록(진도 요약)도 함께 지웁니다.
+    }
     // 핵심 단어를 지우면, 그 아래 파생 단어의 연결만 끊습니다.
-    for (const c of list) if (c.headId === w.id) updates[`${c.id}/headId`] = null
-    await update(ref(db, wordsPath), updates)
+    for (const c of list) if (c.headId === w.id) updates[`${inFolder}/${c.id}/headId`] = null
+    await update(ref(db, `users/${user.uid}`), updates)
     await syncFolderCounts(user.uid, cat, folderKey)
     setOpenId('')
   }

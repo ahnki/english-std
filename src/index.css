@@ -392,3 +392,23 @@ tr.clickable:hover { background: #f3f6fa; }
 /* 터치 화면: 탭할 때 생기는 회색 강조와 더블탭 확대 지연을 없애 바로 반응하게 */
 button, .wsum, tr.clickable { touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
 .option { user-select: none; -webkit-user-select: none; }
+
+/* ---------- 오늘의 학습, 진도 표시 ---------- */
+.today { border-color: #cfe0f3; background: linear-gradient(180deg, #f7fbff 0%, #fff 60%); }
+.today-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 12px; flex-wrap: wrap; }
+.streak { font-size: 0.9rem; color: var(--muted); }
+.streak.on { color: #b45309; font-weight: 700; background: #fff4e0; border-radius: 999px; padding: 3px 12px; }
+.goal { margin-bottom: 4px; }
+.goal-line { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 6px; }
+.goal .bar { margin-bottom: 8px; }
+.today-list { list-style: none; margin: 0; padding: 0; }
+.today-list li { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 7px 0; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+.today-list li:last-child { border-bottom: none; }
+.today-foot { margin: 12px 0 0; text-align: right; }
+.today h3.sub { margin-top: 16px; }
+
+.prog-cell { min-width: 150px; }
+.prog-bar { display: flex; height: 6px; background: var(--line); border-radius: 3px; overflow: hidden; margin-bottom: 4px; }
+.prog-bar .known { background: var(--ok); }
+.prog-bar .learning { background: #7aa7d9; }
+.due-tag { color: #b45309; font-weight: 700; }

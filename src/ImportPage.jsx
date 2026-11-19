@@ -6,6 +6,7 @@ import { parseByCategory } from './parsers'
 import { CATEGORIES, guessCategory, isKnownSheet } from './categories'
 import { formatSenses } from './pos'
 import { buildFolderPayload, folderKeyOf } from './importPayload'
+import { resetProgressPaths } from './progressLogic'
 
 const ROLE_LABEL = { head: '핵심', related: '파생', extra: '추가', main: '' }
 const PREVIEW_STEP = 60
@@ -154,6 +155,7 @@ export default function ImportPage({ user }) {
           [`categories/${cat.id}`]: { name: cat.name, template: cat.template, order: cat.order },
           [`folders/${cat.id}/${payload.key}`]: payload.folder,
           [`words/${cat.id}/${payload.key}`]: payload.words,
+          ...resetProgressPaths(cat.id, payload.key), // 새로 가져온 폴더는 학습 기록도 처음부터
         })
         savedFolders++
         savedWords += p.items.length

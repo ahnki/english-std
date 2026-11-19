@@ -1,17 +1,18 @@
 import { useEffect, useMemo, useState } from 'react'
-import { ref, onValue, update } from 'firebase/database'
+import { ref, onValue, update, increment } from 'firebase/database'
 import { db } from './firebase'
 import { getCategory } from './categories'
 import { meaningText } from './wordsLogic'
 import { applyResult, filterForStudy, pickCards, shuffle, studyStats } from './srs'
 import { canSpeak } from './speech'
+import { dayKey, progressEntry } from './progressLogic'
 import StudySession from './StudySession.jsx'
 
 // 한 번만 읽기: 아직 서버에 저장 중인 답까지 반영된 값을 돌려줍니다.
 const readOnce = (r) => new Promise((resolve, reject) => onValue(r, resolve, reject, { onlyOnce: true }))
 
 // 한 폴더 공부하기: 설정 → 학습 → 결과
-export default function Study({ user, cat, folderKey, onBack }) {
+export default function Study({ user, cat, folderKey, onBack, preset = {} }) {
   const category = getCategory(cat)
   const isToeic = cat === 'toeic'
   const wordsPath = `users/${user.uid}/words/${cat}/${folderKey}`
@@ -27,7 +28,8 @@ export default function Study({ user, cat, folderKey, onBack }) {
   // 설정
   const [mode, setMode] = useState('flash') // flash | quiz
   const [limit, setLimit] = useState(20)
-  const [role, setRole] = useState(isToeic ? 'head' : '')
+  const [role, setRole] = useState(preset.role ?? (isToeic ? 'head' : ''))
+  const [focus, setFocus] = useState(preset.focus || 'both') // both(복습 + 새 단어) | review(복습만) | new(새 단어만)
   const [topic, setTopic] = useState('')
   const [from, setFrom] = useState('')
   const [to, setTo] = useState('')
@@ -67,7 +69,8 @@ export default function Study({ user, cat, folderKey, onBack }) {
   )
   const now = Date.now()
   const stats = studyStats(target, now)
-  const available = pickCards(target, { limit, now, includeNotDue })
+  const pickOptions = { limit, includeNotDue, includeDue: focus !== 'new', includeNew: focus !== 'review' }
+  const available = pickCards(target, { ...pickOptions, now })
   const isEnglishOrKorean = Boolean(category.speech)
 
   function start(cards, practice = false) {
@@ -77,17 +80,38 @@ export default function Study({ user, cat, folderKey, onBack }) {
   }
 
   function startNew() {
-    const cards = pickCards(target, { limit, now: Date.now(), includeNotDue })
+    const cards = pickCards(target, { ...pickOptions, now: Date.now() })
     if (cards.length) start(cards)
   }
 
   // 답을 낼 때마다 화면의 데이터를 바로 갱신하고, 서버 저장은 뒤에서 합니다.
+  // 한 번에 저장하는 것: 단어의 학습 상태, 진도 요약, 오늘의 통계, 폴더별 정답 통계, 마지막으로 공부한 폴더
   // (연습 모드는 기록하지 않아요. 중간에 그만둬도 지금까지의 기록은 남아요.)
   function handleAnswer(card, correct) {
     if (session.practice) return Promise.resolve()
-    const patch = applyResult(card, correct, Date.now())
+    const now = Date.now()
+    const patch = { ...applyResult(card, correct, now), seen: (card.seen || 0) + 1 }
     setWords((prev) => (prev ? { ...prev, [card.id]: { ...prev[card.id], ...patch } } : prev))
-    return update(ref(db, `${wordsPath}/${card.id}`), patch)
+
+    const day = dayKey(now)
+    const kind = correct ? 'right' : 'wrong'
+    const w = `words/${cat}/${folderKey}/${card.id}`
+    return update(ref(db, `users/${user.uid}`), {
+      [`${w}/box`]: patch.box,
+      [`${w}/status`]: patch.status,
+      [`${w}/nextReview`]: patch.nextReview,
+      [`${w}/wrongCount`]: patch.wrongCount,
+      [`${w}/lastStudied`]: patch.lastStudied,
+      [`${w}/seen`]: patch.seen,
+      [`progress/${cat}/${folderKey}/${card.id}`]: progressEntry({ ...card, ...patch }), // 구분(role)은 카드에서 가져와요
+      [`stats/daily/${day}/total`]: increment(1),
+      [`stats/daily/${day}/${kind}`]: increment(1),
+      [`stats/daily/${day}/byCat/${cat}/total`]: increment(1),
+      [`stats/daily/${day}/byCat/${cat}/${kind}`]: increment(1),
+      [`stats/folders/${cat}/${folderKey}/total`]: increment(1),
+      [`stats/folders/${cat}/${folderKey}/${kind}`]: increment(1),
+      'stats/last': { cat, folder: folderKey, at: now },
+    })
   }
 
   function finish(results, quit, pending) {
@@ -204,6 +228,15 @@ export default function Study({ user, cat, folderKey, onBack }) {
               </span>
             </div>
 
+            <div className="field">
+              <span>공부할 단어</span>
+              <div className="seg">
+                <button type="button" className={focus === 'both' ? 'on' : ''} onClick={() => setFocus('both')}>복습 + 새 단어</button>
+                <button type="button" className={focus === 'review' ? 'on' : ''} onClick={() => setFocus('review')}>복습만</button>
+                <button type="button" className={focus === 'new' ? 'on' : ''} onClick={() => setFocus('new')}>새 단어만</button>
+              </div>
+            </div>
+
             <div className="field-row">
               <label className="field">
                 한 번에
@@ -266,9 +299,20 @@ export default function Study({ user, cat, folderKey, onBack }) {
             {target.length === 0 ? (
               <p className="msg bad">조건에 맞는 단어가 없어요. 구분, 주제, 범위를 확인해 주세요.</p>
             ) : available.length === 0 ? (
-              <p className="msg bad">지금은 공부할 단어가 없어요. 모두 공부했고 복습할 때가 아직 안 됐어요. 위의 "복습할 때가 안 된 단어도 포함하기"를 켜면 더 공부할 수 있어요.</p>
+              <p className="msg bad">
+                {focus === 'review'
+                  ? '지금 복습할 단어가 없어요. 복습할 때가 되면 오늘의 학습에 알려드려요.'
+                  : focus === 'new'
+                    ? '새로 공부할 단어가 없어요. 조건에 맞는 단어를 모두 한 번 이상 공부했어요.'
+                    : '지금은 공부할 단어가 없어요. 모두 공부했고 복습할 때가 아직 안 됐어요. 위의 "복습할 때가 안 된 단어도 포함하기"를 켜면 더 공부할 수 있어요.'}
+              </p>
             ) : (
-              <p className="muted small-text">이번에 공부할 단어: {available.length}개 (복습할 단어 먼저, 남는 자리에 새 단어)</p>
+              <p className="muted small-text">
+                이번에 공부할 단어: {available.length}개
+                {focus === 'both' && ' (복습할 단어 먼저, 남는 자리에 새 단어)'}
+                {focus === 'review' && ' (복습할 단어만)'}
+                {focus === 'new' && ' (새 단어만)'}
+              </p>
             )}
 
             <button type="button" className="primary" onClick={startNew} disabled={available.length === 0}>
