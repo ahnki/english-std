@@ -412,3 +412,27 @@ button, .wsum, tr.clickable { touch-action: manipulation; -webkit-tap-highlight-
 .prog-bar .known { background: var(--ok); }
 .prog-bar .learning { background: #7aa7d9; }
 .due-tag { color: #b45309; font-weight: 700; }
+
+/* ---------- 데이터 추가 (엑셀로 여러 개) ---------- */
+.add-seg { margin-bottom: 16px; }
+.form-narrow { max-width: 640px; }
+.link-btn { display: inline-block; background: #fff; border: 1px solid var(--accent); color: var(--accent); border-radius: 8px; padding: 8px 14px; text-decoration: none; font-weight: 600; }
+.link-btn:hover { background: #f0f6fd; }
+.rules { margin: 4px 0 14px; font-size: 0.92rem; }
+.rules summary { cursor: pointer; color: var(--accent); }
+.rules table { margin: 10px 0; }
+.rules td:first-child { width: 36px; font-weight: 700; color: var(--muted); }
+
+.chip-btn { background: #fff; border: 1px solid var(--line); border-radius: 999px; padding: 4px 12px; font-size: 0.85rem; color: var(--ink); }
+.chip-btn.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+.badge.st-new { background: #e6f4ee; border-color: #b7dfcc; color: var(--ok); margin-left: 0; }
+.badge.st-marked { background: #fff4e0; border-color: var(--warn-line); color: #8a5a00; margin-left: 0; }
+.badge.st-dup { background: #eef2f6; border-color: var(--line); color: var(--muted); margin-left: 0; }
+.badge.st-match { background: #eaf1fb; border-color: #c4d8f0; color: var(--accent); margin-left: 0; }
+.badge.st-conflict { background: #fdeceb; border-color: #f0b4b0; color: var(--bad); margin-left: 0; }
+
+.result-card { border-color: #b7dfcc; background: #f7fcf9; }
+.big-line { font-size: 1.15rem; margin: 4px 0 10px; }
+.result-list li { margin-bottom: 12px; list-style: none; }
+.result-list { padding-left: 0; }

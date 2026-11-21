@@ -74,3 +74,26 @@ export function cleanExamples(list, defaultSrc = 'user') {
     .map((e) => ({ en: (e.en || '').trim(), ko: (e.ko || '').trim(), src: e.src || defaultSrc }))
     .filter((e) => e.en)
 }
+
+// 엑셀로 추가하는 새 단어의 저장 모양 (가져오기·직접 추가한 단어와 같은 필드)
+export function buildExcelWord(item, { headId = null, order, now, dup = false }) {
+  return {
+    word: item.word,
+    kind: item.kind,
+    role: item.role,
+    no: item.no ?? null,
+    headId,
+    topic: item.topic ?? null,
+    block: 0,
+    meaning: item.meaning || '',
+    pron: item.pron || '',
+    memo: item.memo || '',
+    examples: cleanExamples(item.examples, 'excel'),
+    dup: Boolean(dup),
+    order,
+    status: 'new',
+    wrongCount: 0,
+    nextReview: 0,
+    createdAt: now,
+  }
+}

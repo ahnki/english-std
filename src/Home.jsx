@@ -125,7 +125,7 @@ export default function Home({ user, initialOpen = '', onOpenFolder, onStudyFold
               <h2>{openCat?.name}</h2>
               {openFolders.length === 0 ? (
                 <p className="muted">
-                  아직 단어가 없어요. <strong>엑셀 가져오기</strong>나 <strong>단어 추가</strong>에서 이 카테고리로 등록해 주세요.
+                  아직 단어가 없어요. <strong>데이터 추가</strong>에서 이 카테고리로 등록해 주세요.
                 </p>
               ) : (
                 <div className="table-wrap">

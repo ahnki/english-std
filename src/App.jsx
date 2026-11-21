@@ -5,16 +5,15 @@ import { isConfigured, app, auth, db } from './firebase'
 import AuthForm from './AuthForm.jsx'
 import Home from './Home.jsx'
 import FolderView from './FolderView.jsx'
-import AddWord from './AddWord.jsx'
+import AddData from './AddData.jsx'
 import Study from './Study.jsx'
-import ImportPage from './ImportPage.jsx'
 
 export default function App() {
   // user: undefined = 확인 중, null = 로그아웃 상태, 객체 = 로그인 상태
   const [user, setUser] = useState(undefined)
   // connected: null = 확인 중, true = 연결됨, false = 연결 안 됨
   const [connected, setConnected] = useState(null)
-  // 지금 보고 있는 화면: home | folder | study | add | import
+  // 지금 보고 있는 화면: home | folder | study | add(데이터 추가)
   const [view, setView] = useState({ name: 'home' })
   const go = (name, params = {}) => setView({ name, ...params })
 
@@ -48,7 +47,7 @@ export default function App() {
   }
 
   // 화면 폭: 단어 목록과 가져오기는 넓게, 추가 화면은 중간, 나머지는 좁게
-  const widthClass = !user ? '' : view.name === 'import' || view.name === 'folder' ? ' wide' : view.name === 'add' || view.name === 'study' ? ' mid' : ''
+  const widthClass = !user ? '' : view.name === 'add' || view.name === 'folder' ? ' wide' : view.name === 'study' ? ' mid' : ''
   const tab = (name, label, on) => (
     <button type="button" className={on ? 'tab on' : 'tab'} onClick={() => go(name)}>
       {label}
@@ -73,8 +72,7 @@ export default function App() {
           <div className="topbar">
             <nav>
               {tab('home', '홈', ['home', 'folder', 'study'].includes(view.name))}
-              {tab('add', '단어 추가', view.name === 'add')}
-              {tab('import', '엑셀 가져오기', view.name === 'import')}
+              {tab('add', '데이터 추가', view.name === 'add')}
             </nav>
             <div className="who">
               <span className="muted">{user.email}</span>
@@ -100,7 +98,7 @@ export default function App() {
               cat={view.cat}
               folderKey={view.key}
               onBack={() => go('home', { cat: view.cat })}
-              onAdd={() => go('add', { cat: view.cat, key: view.key })}
+              onAdd={() => go('add', { cat: view.cat, key: view.key, mode: 'one' })}
               onStudy={() => go('study', { cat: view.cat, key: view.key })}
             />
           )}
@@ -115,15 +113,15 @@ export default function App() {
             />
           )}
           {view.name === 'add' && (
-            <AddWord
-              key={`${view.cat || ''}/${view.key || ''}`}
+            <AddData
+              key={`${view.cat || ''}/${view.key || ''}/${view.mode || ''}`}
               user={user}
               defaultCat={view.cat}
               defaultFolder={view.key}
+              initialMode={view.mode || 'excel'}
               onOpenFolder={(cat, key) => go('folder', { cat, key })}
             />
           )}
-          {view.name === 'import' && <ImportPage user={user} />}
         </>
       )}
 
